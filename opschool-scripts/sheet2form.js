@@ -85,6 +85,7 @@ function setUpForm_(ss, values) {
     var an2 = question[2];
     var an3 = question[3];
     var an4 = question[4];
+    var an5 = question[5];
     // Browser.msgBox(an1 + an2 + an3 + an4);s
 
     var header = form.addSectionHeaderItem().setTitle('Question' + i);
@@ -94,7 +95,8 @@ function setUpForm_(ss, values) {
         item.createChoice(an1),
         item.createChoice(an2),
         item.createChoice(an3),
-        item.createChoice(an4)
+        item.createChoice(an4),
+        item.createChoice(an5)
       ])
       .showOtherOption(false);
 
@@ -110,6 +112,7 @@ function setUpForm_(ss, values) {
  *     see https://developers.google.com/apps-script/understanding_events
  */
 function onFormSubmit(e) {
+  var cnst_other_question = "I am not familiar with this topic";
   var user = {
     name: e.namedValues["Name"][0],
     email: e.namedValues["Email"][0],
@@ -127,35 +130,56 @@ function onFormSubmit(e) {
     system: 0,
     total: 0
   }
+  var devops_overqualified_result = 0.4;
+  var system_underqualified_result = 0.4;
 
   // Grab the session data again so that we can match it to the user's choices.
+  var param_values = SpreadsheetApp.getActive().getSheetByName('params')
   var exam_values = SpreadsheetApp.getActive().getSheetByName('opschool_exam')
     .getDataRange().getValues();
   var results_ss = SpreadsheetApp.getActive().getSheetByName('opschool_exam_results');
   var results_values = results_ss.getDataRange().getValues();
 
-  // last_row = results_ss.getLastRow()
-  // results_ss.getRange("A1").setValue(last_row)
+  // get constants from params sheet
+  for (var i = 0; i < param_values.length; i++) {
+    var param_data = param_values[i];
+    switch (param_data[0]) {
+      case "pass_message":
+        pass_message = param_data[1];
+        break;
+      case "fail_message":
+        fail_message = param_data[1];
+        break;
+      case "devops_overqualified_result":
+        devops_overqualified_result = param_data[1];
+        break;
+      case "system_underqualified_result":
+        system_underqualified_result = param_data[1];
+        break;
+    }
 
-  // results_ss.appendRow([user.name, user.email, user.devops_score, user.system_score, user.pass]);
-  // results_ss.appendRow([user.name, user.email, user.devops_score, user.system_score, user.pass]);
 
-
+  }
+  // calculate all answers from attendees
   for (var i = 1; i < exam_values.length; i++) {
     var question_data = exam_values[i];
     question = question_data[0]
-    question_related_field = question_data[6]
-    correct_answer = question_data[5]
-    // results_ss.appendRow(["QUESTION", question, question_related_field, correct_answer]);
+    question_related_field = question_data[7]
+    correct_answer = question_data[6]
 
-    questions_count[question_related_field]++
-    questions_count.total = questions_count.total + 1;
-
-    // results_ss.appendRow(["hash", questions_count["devops"], questions_count["system"], questions_count["total"], questions_count.total]);
+    questions_count[question_related_field]++;
+    questions_count.total++;
+    // questions_count.total = questions_count.total + 1;
 
 
     if (e.namedValues[question] == correct_answer) {
-      user.correct_answers[question_related_field] = user.correct_answers[question_related_field] + 1;
+      // user.correct_answers[question_related_field] = user.correct_answers[question_related_field] + 1;
+      user.correct_answers[question_related_field]++;
+    }
+
+    if (e.namedValues[question] == cnst_other_question) {
+      user.correct_answers[question_related_field] = user.correct_answers[question_related_field] + 0.25;
+
     }
   }
   user.devops_score = user.correct_answers.devops / questions_count.devops
@@ -163,11 +187,29 @@ function onFormSubmit(e) {
   if (user.devops_score > 0.4 && user.system_score > 0.4) {
     user.pass = true
   }
-  results_ss.appendRow([user.name, user.email, user.devops_score, user.system_score, user.pass]);
+
+
+  switch (true) {
+    case user.devops_score > devops_overqualified_result:
+      user.pass = false
+      user.pass_reason = "devops-overqualified"
+      break;
+    case user.system_score < system_underqualified_result:
+      user.pass = false
+      user.pass_reason = "system-underqualified"
+      break;
+    case user.system_score >= system_underqualified_result:
+      user.pass = true
+      user.pass_reason = "system-underqualified"
+      break;
+  }
+
+  results_ss.appendRow([user.name, user.email, user.devops_score, user.system_score, user.pass, user.pass_reason]);
+
   if (user.pass) {
-    body_message = 'Thanks for taking the OpsSchool test! We\'re happy to inform you that you had passed the test. Here is the link for the second assignment'
+    body_message = pass_message
   } else {
-    body_message = 'Thanks for taking the OpsSchool test! Unfortunately you didn\'t pass the test'
+    body_message = fail_message
   }
   MailApp.sendEmail({
     to: user.email,
