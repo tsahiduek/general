@@ -75,6 +75,7 @@ function setUpForm_(ss, values) {
   var form = FormApp.create('OpsSchool-exam');
   form.setAllowResponseEdits(false);
   form.setLimitOneResponsePerUser(true);
+  form.setShuffleQuestions(true);
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
   form.addTextItem().setTitle('Name').setRequired(true);
   form.addTextItem().setTitle('Email').setRequired(true).setValidation(FormApp.createTextValidation().requireTextIsEmail().build());
@@ -134,6 +135,7 @@ function onFormSubmit(e) {
   }
   var devops_overqualified_result = 0.4;
   var system_underqualified_result = 0.4;
+  var send_mail = false;
 
   // Grab the session data again so that we can match it to the user's choices.
   var param_values = SpreadsheetApp.getActive().getSheetByName('params')
@@ -157,6 +159,9 @@ function onFormSubmit(e) {
         break;
       case "system_underqualified_result":
         system_underqualified_result = param_data[1];
+        break;
+      case "send_mail":
+        send_mail = true;
         break;
     }
 
@@ -202,21 +207,22 @@ function onFormSubmit(e) {
       break;
     case user.system_score >= system_underqualified_result:
       user.pass = true
-      user.pass_reason = "system-underqualified"
+      user.pass_reason = "system-passed"
       break;
   }
 
   results_ss.appendRow([user.name, user.email, user.devops_score, user.system_score, user.pass, user.pass_reason]);
-
-  if (user.pass) {
-    body_message = pass_message
-  } else {
-    body_message = fail_message
+  if (send_mail) {
+    if (user.pass) {
+      body_message = pass_message
+    } else {
+      body_message = fail_message
+    }
+    MailApp.sendEmail({
+      to: user.email,
+      subject: user.name,
+      body: body_message
+      // attachments: doc.getAs(MimeType.PDF)
+    });
   }
-  MailApp.sendEmail({
-    to: user.email,
-    subject: user.name,
-    body: body_message
-    // attachments: doc.getAs(MimeType.PDF)
-  });
 }
