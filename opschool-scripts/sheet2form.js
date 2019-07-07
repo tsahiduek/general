@@ -73,6 +73,8 @@ function setUpOpsschoolForm() {
 function setUpForm_(ss, values) {
 
   var form = FormApp.create('OpsSchool-exam');
+  form.setAllowResponseEdits(false);
+  form.setLimitOneResponsePerUser(true);
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
   form.addTextItem().setTitle('Name').setRequired(true);
   form.addTextItem().setTitle('Email').setRequired(true).setValidation(FormApp.createTextValidation().requireTextIsEmail().build());
