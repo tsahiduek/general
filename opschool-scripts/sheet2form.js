@@ -76,6 +76,7 @@ function setUpForm_(ss, values) {
   form.setAllowResponseEdits(false);
   form.setLimitOneResponsePerUser(true);
   form.setShuffleQuestions(true);
+  form.requiresLogin(false);
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
   form.addTextItem().setTitle('Name').setRequired(true);
   form.addTextItem().setTitle('Email').setRequired(true).setValidation(FormApp.createTextValidation().requireTextIsEmail().build());
